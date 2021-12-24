@@ -1,7 +1,7 @@
 package main
 
-// fetch --dur 5m --fake
-// init - build flag data
+// usage:
+//   fetch --dur <delay> [--fake]
 //
 import (
 	"encoding/json"
@@ -14,6 +14,7 @@ import (
 )
 
 type stock_data struct {
+	market     string
 	symbol     string
 	price      float64
 	ave_50day  float64
@@ -27,12 +28,13 @@ type stock_data struct {
 }
 
 // Constant values
-const FAKE_DATA = true
 
-const HDG1 = " sym  price  ave 50 ave200 close   open   low    high  low52w hi52w"
-const HDG2 = "===== ====== ====== ====== ====== ====== ====== ====== ====== ======"
-const URL1 = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=%s`
-const URL2 = `&range=1d&interval=5m&indicators=close&includeTimestamps=false&includePrePost=false&corsDomain=finance.yahoo.com&.tsrc=finance`
+const HDG1 = " sym  price  ave 50 ave200 close   open   low    high  low52w hi52w   chg"
+const HDG2 = "===== ====== ====== ====== ====== ====== ====== ====== ====== ====== ====="
+const URL1 = "https://query1.finance.yahoo.com/v7/finance/quote?symbols=%s"
+const URL2 = "&range=1d&interval=5m&indicators=close&includeTimestamps=false" +
+	"&includePrePost=false&corsDomain=finance.yahoo.com" +
+	"&.tsrc=finance"
 
 // Global variables
 
@@ -50,16 +52,19 @@ func main() {
 	flag.Parse()
 	fmt.Println("Interval:", g_interval)
 	fmt.Println("Fake?:", g_fake_data)
+	fmt.Println("flag args:", flag.Arg(0))
 
 	for {
+		fmt.Println("")
+		dt := time.Now()
+		fmt.Println("Time:", dt.Format("15:04:05"))
 		fmt.Println(HDG1)
 		fmt.Println(HDG2)
-		if FAKE_DATA {
-			fmt.Println("FAKE data")
+		if g_fake_data {
 			body, err = os.ReadFile("body.txt")
 			check(err)
 		} else {
-			url := fmt.Sprintf(URL1, "BRK-B,VBK")
+			url := fmt.Sprintf(URL1, flag.Arg(0))
 			url += URL2
 			response, err := http.Get(url)
 			check(err)
@@ -76,28 +81,22 @@ func main() {
 }
 
 func parse_and_print(body []byte) {
+	var market_state string
 	d := map[string]map[string][]map[string]interface{}{}
 	err := json.Unmarshal(body, &d)
 	check(err)
-	for num, dict_data := range d["quoteResponse"]["result"] {
+	for _, dict_data := range d["quoteResponse"]["result"] {
 		var data stock_data
-		fmt.Println("result:", num)
+		// fmt.Println("result:", num)
 		build_data(dict_data, &data)
 		print_stock_data(&data)
-		// keys := make([]string, 0, len(data))
-		// for k := range data {
-		// 	keys = append(keys, k)
-		// }
-		// sort.Strings(keys)
-		// for _, k := range keys {
-		// 	fmt.Printf("%s : %T : ", k, data[k])
-		// 	fmt.Println(data[k])
-		// }
+		market_state = data.market
 	}
-	// print_map(d)
+	fmt.Println("Market is ", market_state)
 }
 
 func build_data(dict_data map[string]interface{}, data *stock_data) {
+	data.market = dict_data["marketState"].(string)
 	data.symbol = dict_data["symbol"].(string)
 	data.price = dict_data["regularMarketPrice"].(float64)
 	data.ave_50day = dict_data["fiftyDayAverage"].(float64)
@@ -111,9 +110,10 @@ func build_data(dict_data map[string]interface{}, data *stock_data) {
 }
 
 func print_stock_data(data *stock_data) {
-	fmt.Println(data.symbol, data.price, data.ave_50day, data.ave_200day,
+	fmt.Printf("%-5s %6.2f %6.2f %6.2f %6.2f %6.2f %6.2f %6.2f %6.2f %6.2f %5.2f\n",
+		data.symbol, data.price, data.ave_50day, data.ave_200day,
 		data.prev_close, data.open, data.low, data.high,
-		data.low_52w, data.high_52w)
+		data.low_52w, data.high_52w, data.price-data.prev_close)
 }
 
 func check(err error) {
