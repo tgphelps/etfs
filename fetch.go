@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"time"
@@ -45,6 +45,7 @@ func init() {
 	flag.DurationVar(&g_interval, "dur", 5*time.Minute, "web fetch delay")
 	flag.BoolVar(&g_fake_data, "fake", false, "use fake data")
 }
+
 func main() {
 	var body []byte
 	var err error
@@ -54,6 +55,7 @@ func main() {
 	fmt.Println("Fake?:", g_fake_data)
 	fmt.Println("flag args:", flag.Arg(0))
 
+	// This loops until the user interrupts it with ctrl+C.
 	for {
 		fmt.Println("")
 		dt := time.Now()
@@ -68,23 +70,30 @@ func main() {
 			url += URL2
 			response, err := http.Get(url)
 			check(err)
-			body, err = ioutil.ReadAll(response.Body)
+			body, err = io.ReadAll(response.Body)
 			check(err)
 			response.Body.Close()
 		}
 		// fmt.Println(string(body))
 		// err = os.WriteFile("body.txt", body, 0644)
 		// check(err)
-		parse_and_print(body)
+		if parse_and_print(body) {
+			break
+		}
 		time.Sleep(g_interval)
 	}
 }
 
-func parse_and_print(body []byte) {
+func parse_and_print(body []byte) bool {
 	var market_state string
 	d := map[string]map[string][]map[string]interface{}{}
 	err := json.Unmarshal(body, &d)
-	check(err)
+	if err != nil {
+		fmt.Println("json.Unmarshal error:")
+		fmt.Println(err)
+		fmt.Println(body)
+		panic("STOP")
+	}
 	for _, dict_data := range d["quoteResponse"]["result"] {
 		var data stock_data
 		// fmt.Println("result:", num)
@@ -93,6 +102,11 @@ func parse_and_print(body []byte) {
 		market_state = data.market
 	}
 	fmt.Println("Market is ", market_state)
+	if market_state == "POST" {
+		return true
+	} else {
+		return false
+	}
 }
 
 func build_data(dict_data map[string]interface{}, data *stock_data) {
