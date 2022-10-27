@@ -1,0 +1,5 @@
+#!/bin/sh
+
+SYMS=BND,VGLT,VCSH,VCIT,VCLT,VMBS,VTEB
+
+./fetch $SYMS
