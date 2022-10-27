@@ -2,4 +2,4 @@
 
 SYMS=BRK-B,VBK,VB,VOT,MGK,VPU,VNQ
 
-./fetch $SYMS
+./bin/fetch $SYMS

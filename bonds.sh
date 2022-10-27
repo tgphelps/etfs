@@ -2,4 +2,4 @@
 
 SYMS=BND,VGLT,VCSH,VCIT,VCLT,VMBS,VTEB
 
-./fetch $SYMS
+./bin/fetch $SYMS
