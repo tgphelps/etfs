@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -84,28 +85,45 @@ func do_list(db *sql.DB) {
 		var text string
 		var active int
 		row.Scan(&symbol, &text, &active)
-		fmt.Printf("%4s %30ss   %d\n", symbol, text, active)
+		fmt.Printf("%5s %30s   %d\n", symbol, text, active)
 	}
 }
 
 func do_insert(f []string, db *sql.DB) {
-
+	stmt, err := db.Prepare("insert into etf (symbol, name, active) values (?, ?, ?)")
+	check(err)
+	stmt.Exec(f[1], strings.Join(f[2:], " "), 0)
 }
 
 func do_update(f []string, db *sql.DB) {
-
+	stmt, err := db.Prepare("update etf set name = ? where symbol = ?")
+	check(err)
+	stmt.Exec(strings.Join(f[2:], " "), f[1])
 }
 
 func do_activate(f []string, db *sql.DB) {
-
+	stmt, err := db.Prepare("update etf set active = ? where symbol = ?")
+	check(err)
+	flag, _ := strconv.Atoi(f[2])
+	stmt.Exec(flag, f[1])
 }
 
 func do_delete(f []string, db *sql.DB) {
-
+	stmt, err := db.Prepare("delete from etf where symbol = ?")
+	check(err)
+	stmt.Exec(f[1])
 }
 
 func do_view(f []string, db *sql.DB) {
-
+	row, err := db.Query("select symbol, name, active from etf where symbol == ?", f[1])
+	check(err)
+	for row.Next() {
+		var symbol string
+		var text string
+		var active int
+		row.Scan(&symbol, &text, &active)
+		fmt.Printf("%4s %30ss   %d\n", symbol, text, active)
+	}
 }
 
 func check(err error) {

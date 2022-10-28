@@ -9,3 +9,6 @@ manage:
 
 clean:
 	rm bin/*
+
+sql:
+	sqlite3 etfs.db
