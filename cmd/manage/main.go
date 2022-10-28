@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"database/sql"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"strings"
 
@@ -14,14 +16,32 @@ func main() {
 	sql_db, _ := sql.Open("sqlite3", "/home/tgphelps/src/go/etfs/etfs.db")
 	defer sql_db.Close()
 
+main_loop:
 	for {
 		f := get_command()
 		if len(f) > 1 {
 			f[1] = strings.ToUpper(f[1])
 		}
-		fmt.Println(f)
-		if f[0] == "q" {
-			break
+		fmt.Println("cmd: ", f)
+		switch f[0] {
+		case "q":
+			break main_loop
+		case "h":
+			do_help()
+		case "l":
+			do_list(sql_db)
+		case "i":
+			do_insert(f, sql_db)
+		case "u":
+			do_update(f, sql_db)
+		case "a":
+			do_activate(f, sql_db)
+		case "d":
+			do_delete(f, sql_db)
+		case "v":
+			do_view(f, sql_db)
+		default:
+			do_help()
 		}
 	}
 }
@@ -39,6 +59,57 @@ func get_command() []string {
 func read_command(prompt string) string {
 	fmt.Print(prompt)
 	r := bufio.NewReader(os.Stdin)
-	cmd, _ := r.ReadString(('\n'))
+	cmd, err := r.ReadString(('\n'))
+	if err == io.EOF {
+		return "q"
+	}
 	return strings.TrimSpace(cmd)
+}
+
+func do_help() {
+	fmt.Println("commands: l(ist) i(nsert) u(update) d(delete) v(iew) a(activate) q(uit)")
+	fmt.Println("i <sym> <name>")
+	fmt.Println("u <sym> <name>")
+	fmt.Println("d <sym>")
+	fmt.Println("v <sym>")
+	fmt.Println("a <sym> <0/1>")
+}
+
+func do_list(db *sql.DB) {
+	row, err := db.Query(("select symbol, name, active from etf order by symbol"))
+	check(err)
+	defer row.Close()
+	for row.Next() {
+		var symbol string
+		var text string
+		var active int
+		row.Scan(&symbol, &text, &active)
+		fmt.Printf("%4s %30ss   %d\n", symbol, text, active)
+	}
+}
+
+func do_insert(f []string, db *sql.DB) {
+
+}
+
+func do_update(f []string, db *sql.DB) {
+
+}
+
+func do_activate(f []string, db *sql.DB) {
+
+}
+
+func do_delete(f []string, db *sql.DB) {
+
+}
+
+func do_view(f []string, db *sql.DB) {
+
+}
+
+func check(err error) {
+	if err != nil {
+		log.Panic(err)
+	}
 }
