@@ -80,10 +80,11 @@ func do_list(db *sql.DB) {
 	row, err := db.Query(("select symbol, name, active from etf order by symbol"))
 	check(err)
 	defer row.Close()
+
+	var symbol string
+	var text string
+	var active int
 	for row.Next() {
-		var symbol string
-		var text string
-		var active int
 		row.Scan(&symbol, &text, &active)
 		fmt.Printf("%5s %30s   %d\n", symbol, text, active)
 	}
@@ -117,10 +118,11 @@ func do_delete(f []string, db *sql.DB) {
 func do_view(f []string, db *sql.DB) {
 	row, err := db.Query("select symbol, name, active from etf where symbol == ?", f[1])
 	check(err)
+
+	var symbol string
+	var text string
+	var active int
 	for row.Next() {
-		var symbol string
-		var text string
-		var active int
 		row.Scan(&symbol, &text, &active)
 		fmt.Printf("%4s %30ss   %d\n", symbol, text, active)
 	}

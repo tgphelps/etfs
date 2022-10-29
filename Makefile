@@ -7,6 +7,9 @@ fetch:
 manage:
 	go build -o bin ./cmd/manage
 
+portfolio:
+	go build -o bin ./cmd/portfolio
+
 clean:
 	rm bin/*
 
