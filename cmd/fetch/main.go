@@ -7,10 +7,10 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"time"
+
+	etfs "tgphelps.com/etfs/pkg"
 )
 
 type stock_data struct {
@@ -66,17 +66,8 @@ func main() {
 			body, err = os.ReadFile("body.txt")
 			check(err)
 		} else {
-			url := fmt.Sprintf(URL1, flag.Arg(0))
-			url += URL2
-			response, err := http.Get(url)
-			check(err)
-			body, err = io.ReadAll(response.Body)
-			check(err)
-			response.Body.Close()
+			body = etfs.Fetch_stock_data(flag.Arg(0))
 		}
-		// fmt.Println(string(body))
-		// err = os.WriteFile("body.txt", body, 0644)
-		// check(err)
 		if parse_and_print(body) {
 			break
 		}
