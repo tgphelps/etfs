@@ -3,9 +3,9 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -22,15 +22,27 @@ type stock_data struct {
 	pct_gain float64
 }
 
+type event struct {
+	event_type string
+	symbol     string
+	shares     int
+	date       string
+	amount     float64
+}
+
 func main() {
+	var testing bool
+	flag.BoolVar(&testing, "t", false, "turn on testing code")
+	flag.Parse()
 	sql_db, err := sql.Open("sqlite3", "/home/tgphelps/src/go/etfs/etfs.db")
 	check(err)
 	defer sql_db.Close()
 
-	args := os.Args[1:]
+	args := flag.Args()
+	// fmt.Println("args:", args)
 	if len(args) > 0 {
 		if args[0] == "build" {
-			build_portfolio(sql_db)
+			build_portfolio(sql_db, testing)
 		}
 	}
 	show_portfolio(sql_db)
@@ -75,8 +87,43 @@ func show_portfolio(db *sql.DB) {
 	fmt.Printf("Total gain: %8.2f %6.2f\n", total_gain, (100 * total_gain / total_basis))
 }
 
-func build_portfolio(db *sql.DB) {
-	log.Panic("build not implemented")
+func build_portfolio(db *sql.DB, testing bool) {
+	// Read all buy/sell events and build portfolio array
+	// fmt.Println("build")
+	row, err := db.Query("select event_type, symbol, shares, date, amount from event order by id")
+	check(err)
+	var e event
+	p := make(map[string]etfs.Holding)
+
+	for row.Next() {
+		row.Scan(&e.event_type, &e.symbol, &e.shares, &e.date, &e.amount)
+		// fmt.Println("event for: ", e.symbol)
+		if _, found := p[e.symbol]; !found {
+			p[e.symbol] = etfs.Holding{Sym: e.symbol}
+			fmt.Println("added key:", e.symbol)
+		}
+		switch e.event_type {
+		case "BUY":
+			fmt.Println("buy ", e.symbol)
+			h := p[e.symbol]
+			h.Buy_shares(e.shares, e.amount)
+			p[e.symbol] = h
+		case "SELL":
+			fmt.Println("sell ", e.symbol)
+			h := p[e.symbol]
+			h.Sell_shares(e.shares, e.amount)
+			p[e.symbol] = h
+		default:
+			log.Panic("Bad event type")
+		}
+	}
+	if testing {
+		fmt.Println("testing...")
+		for h := range p {
+			fmt.Println(p[h].Sym, p[h].Shares, p[h].Ave_cost, p[h].Total_cost)
+		}
+	}
+	// Write portfolio to real or test portfolio table.
 }
 
 func get_closing_price(symbol string) float64 {
