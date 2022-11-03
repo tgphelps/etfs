@@ -45,7 +45,7 @@ func main() {
 			build_portfolio(sql_db, testing)
 		}
 	}
-	show_portfolio(sql_db)
+	show_portfolio(sql_db, testing)
 }
 
 func check(err error) {
@@ -54,8 +54,16 @@ func check(err error) {
 	}
 }
 
-func show_portfolio(db *sql.DB) {
-	row, err := db.Query(("select symbol, shares, basis, basis/shares as ave_cost from portfolio order by symbol"))
+func show_portfolio(db *sql.DB, testing bool) {
+	// XXX This needs to use the testing flag
+	var suffix string
+	if testing {
+		suffix = "2"
+	} else {
+		suffix = ""
+	}
+	sql := fmt.Sprintf("select symbol, shares, basis, basis/shares as ave_cost from portfolio%s order by symbol", suffix)
+	row, err := db.Query(sql)
 	check(err)
 
 	var stocks []stock_data
@@ -67,6 +75,9 @@ func show_portfolio(db *sql.DB) {
 		row.Scan(&stock.symbol, &stock.shares, &stock.basis, &stock.ave_cost)
 		stocks = append(stocks, stock)
 		syms = append(syms, stock.symbol)
+	}
+	if len(syms) == 0 {
+		log.Panic("No portfolio rows.")
 	}
 	stock_list := strings.Join(syms, ",")
 	get_price_data(stock_list)
@@ -88,8 +99,9 @@ func show_portfolio(db *sql.DB) {
 }
 
 func build_portfolio(db *sql.DB, testing bool) {
-	// Read all buy/sell events and build portfolio array
-	// fmt.Println("build")
+	// Read all buy/sell events and build portfolio array.
+
+	// The 'order by id' insures that the events are in chronological order.
 	row, err := db.Query("select event_type, symbol, shares, date, amount from event order by id")
 	check(err)
 	var e event
@@ -100,30 +112,50 @@ func build_portfolio(db *sql.DB, testing bool) {
 		// fmt.Println("event for: ", e.symbol)
 		if _, found := p[e.symbol]; !found {
 			p[e.symbol] = etfs.Holding{Sym: e.symbol}
-			fmt.Println("added key:", e.symbol)
+			// fmt.Println("added key:", e.symbol)
 		}
 		switch e.event_type {
 		case "BUY":
-			fmt.Println("buy ", e.symbol)
+			// fmt.Println("buy ", e.symbol)
 			h := p[e.symbol]
 			h.Buy_shares(e.shares, e.amount)
 			p[e.symbol] = h
 		case "SELL":
-			fmt.Println("sell ", e.symbol)
+			// fmt.Println("sell ", e.symbol)
 			h := p[e.symbol]
 			h.Sell_shares(e.shares, e.amount)
 			p[e.symbol] = h
 		default:
-			log.Panic("Bad event type")
+			log.Panic("Bad event type:", e.event_type, e.symbol)
 		}
 	}
 	if testing {
 		fmt.Println("testing...")
 		for h := range p {
-			fmt.Println(p[h].Sym, p[h].Shares, p[h].Ave_cost, p[h].Total_cost)
+			if p[h].Shares > 0 {
+				fmt.Println(p[h].Sym, p[h].Shares, p[h].Total_cost, p[h].Ave_cost)
+			}
 		}
 	}
 	// Write portfolio to real or test portfolio table.
+	var tbl_name string
+	if testing {
+		tbl_name = "portfolio2"
+	} else {
+		tbl_name = "portfolio"
+	}
+	// Truncate table
+	del_sql := fmt.Sprintf("delete from %s", tbl_name)
+	tx, err := db.Begin()
+	check(err)
+	_, err = tx.Exec(del_sql)
+	check(err)
+	// fmt.Println("truncated table: ", tbl_name)
+
+	// Insert into table
+	insert_holdings(tx, tbl_name, p)
+	err = tx.Commit()
+	check(err)
 }
 
 func get_closing_price(symbol string) float64 {
@@ -156,4 +188,15 @@ func get_price_data(syms string) {
 		prices[symbol] = last
 	}
 	// fmt.Println(prices)
+}
+
+func insert_holdings(tx *sql.Tx, tbl string, p map[string]etfs.Holding) {
+	// fmt.Println("insert holdings...")
+	for h := range p {
+		if p[h].Shares > 0 {
+			sql := fmt.Sprintf("insert into %s (symbol, shares, basis) values (?, ?, ?)", tbl)
+			_, err := tx.Exec(sql, p[h].Sym, p[h].Shares, p[h].Total_cost)
+			check(err)
+		}
+	}
 }
