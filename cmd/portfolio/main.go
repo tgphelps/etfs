@@ -34,16 +34,15 @@ func main() {
 	var testing bool
 	flag.BoolVar(&testing, "t", false, "turn on testing code")
 	flag.Parse()
+
 	sql_db, err := sql.Open("sqlite3", "/home/tgphelps/src/go/etfs/etfs.db")
 	check(err)
 	defer sql_db.Close()
 
 	args := flag.Args()
 	// fmt.Println("args:", args)
-	if len(args) > 0 {
-		if args[0] == "build" {
-			build_portfolio(sql_db, testing)
-		}
+	if len(args) > 0 && args[0] == "build" {
+		build_portfolio(sql_db, testing)
 	}
 	show_portfolio(sql_db, testing)
 }
@@ -55,14 +54,15 @@ func check(err error) {
 }
 
 func show_portfolio(db *sql.DB, testing bool) {
-	// XXX This needs to use the testing flag
 	var suffix string
 	if testing {
 		suffix = "2"
+		fmt.Println("testing...")
 	} else {
 		suffix = ""
 	}
-	sql := fmt.Sprintf("select symbol, shares, basis, basis/shares as ave_cost from portfolio%s order by symbol", suffix)
+	sql := fmt.Sprintf("select symbol, shares, basis, basis/shares as ave_cost "+
+		"from portfolio%s order by symbol", suffix)
 	row, err := db.Query(sql)
 	check(err)
 
@@ -70,6 +70,7 @@ func show_portfolio(db *sql.DB, testing bool) {
 	var syms []string
 	var total_gain float64
 	var total_basis float64
+
 	for row.Next() {
 		var stock stock_data
 		row.Scan(&stock.symbol, &stock.shares, &stock.basis, &stock.ave_cost)
@@ -82,6 +83,7 @@ func show_portfolio(db *sql.DB, testing bool) {
 	stock_list := strings.Join(syms, ",")
 	get_price_data(stock_list)
 	// fmt.Println("stock list:", stock_list)
+
 	fmt.Println("")
 	fmt.Println("SYMBOL SHARES  BASIS   AVE COST PRICE    GAIN   %% GAIN")
 	fmt.Println("------ ------ -------- -------- ------ -------- -------")
@@ -91,7 +93,8 @@ func show_portfolio(db *sql.DB, testing bool) {
 		s.pct_gain = 100 * (s.gain / s.basis)
 		total_gain += s.gain
 		total_basis += s.basis
-		fmt.Printf("%-6s %6d %8.2f %8.2f %6.2f % 8.2f % 6.2f%%\n", s.symbol, s.shares, s.basis, s.ave_cost, s.price, s.gain, s.pct_gain)
+		fmt.Printf("%-6s %6d %8.2f %8.2f %6.2f % 8.2f % 6.2f%%\n",
+			s.symbol, s.shares, s.basis, s.ave_cost, s.price, s.gain, s.pct_gain)
 	}
 	fmt.Println("")
 	fmt.Printf("Total basis: %10.2f\n", total_basis)
@@ -104,6 +107,7 @@ func build_portfolio(db *sql.DB, testing bool) {
 	// The 'order by id' insures that the events are in chronological order.
 	row, err := db.Query("select event_type, symbol, shares, date, amount from event order by id")
 	check(err)
+
 	var e event
 	p := make(map[string]etfs.Holding)
 
@@ -137,14 +141,14 @@ func build_portfolio(db *sql.DB, testing bool) {
 			}
 		}
 	}
-	// Write portfolio to real or test portfolio table.
+
 	var tbl_name string
 	if testing {
 		tbl_name = "portfolio2"
 	} else {
 		tbl_name = "portfolio"
 	}
-	// Truncate table
+
 	del_sql := fmt.Sprintf("delete from %s", tbl_name)
 	tx, err := db.Begin()
 	check(err)
@@ -152,7 +156,6 @@ func build_portfolio(db *sql.DB, testing bool) {
 	check(err)
 	// fmt.Println("truncated table: ", tbl_name)
 
-	// Insert into table
 	insert_holdings(tx, tbl_name, p)
 	err = tx.Commit()
 	check(err)

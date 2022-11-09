@@ -10,6 +10,12 @@ manage:
 portfolio:
 	go build -o bin ./cmd/portfolio
 
+income:
+	go build -o bin ./cmd/income
+
+build_gains:
+	go build -o bin ./cmd/build_gains
+
 clean:
 	rm bin/*
 
