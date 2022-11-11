@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -41,11 +42,51 @@ func check(err error) {
 
 func show_all_income(db *sql.DB) {
 	fmt.Println("showing all income")
+
+	row, err := db.Query("select date, symbol, shares, basis, amount from capital_gain order by date, symbol")
+	check(err)
+	var total_gain float64
+
+	fmt.Println("   DATE    SYM  SHRS   BUY->SELL       DIFF    GAIN")
+	fmt.Println("---------- ---- ---- ---------------- ------- ------")
+	for row.Next() {
+		var date string
+		var symbol string
+		var shares int
+		var basis float64
+		var amount float64
+		row.Scan(&date, &symbol, &shares, &basis, &amount)
+
+		diff := amount - basis
+		gain := float64(shares) * diff
+		total_gain += gain
+
+		fmt.Printf("%10s %-4s %4d (%6.2f->%6.2f) %7.2f %7.2f\n",
+			date, symbol, shares, basis, amount, diff, gain)
+	}
+	fmt.Printf("Total gain: %7.2f\n", total_gain)
 }
 
 func show_income_for_sym(db *sql.DB, sym string) {
 	if sym == "" {
 		log.Panic("can't happen")
 	}
-	fmt.Printf("showing income for %s\n", sym)
+	sym = strings.ToUpper(sym)
+	row, err := db.Query("select date, shares, basis, amount from capital_gain where symbol = ? order by date",
+		sym)
+	check(err)
+	fmt.Println("   DATE    SYM  SHRS   BUY->SELL       DIFF    GAIN")
+	fmt.Println("---------- ---- ---- ---------------- ------- -------")
+
+	for row.Next() {
+		var date string
+		var shares int
+		var basis float64
+		var amount float64
+		row.Scan(&date, &shares, &basis, &amount)
+		diff := amount - basis
+		gain := float64(shares) * diff
+		fmt.Printf("%10s %-4s %4d (%6.2f->%6.2f) %7.2f %7.2f\n",
+			date, sym, shares, basis, amount, diff, gain)
+	}
 }
