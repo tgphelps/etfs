@@ -7,6 +7,8 @@ fetch:
 manage:
 	go build -o bin ./cmd/manage
 
+mktrans:
+	go build -o bin ./cmd/mktrans
 portfolio:
 	go build -o bin ./cmd/portfolio
 
