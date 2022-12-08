@@ -13,6 +13,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 
@@ -20,20 +21,32 @@ import (
 )
 
 func main() {
+	var testing bool
+	var usage bool
+
+	flag.BoolVar(&testing, "t", false, "testing: no SQL executed")
+	flag.BoolVar(&usage, "u", false, "show usage")
 	flag.Parse()
+	if usage {
+		print_usage()
+		os.Exit(0)
+	}
 	if len(flag.Args()) != 5 {
 		log.Panic("need exactly 5 arguments")
 	}
-	sql_db, err := sql.Open("sqlite3", "/home/tgphelps/src/go/etfs/etfs.db")
-	check(err)
-	defer sql_db.Close()
 	xactn, symbol, shares, amount, date := convert_args(flag.Args())
-	fmt.Println(xactn, symbol, shares, amount, date)
-
-	stmt, err := sql_db.Prepare("insert into event (event_type, symbol, shares, date, amount) values (?, ?, ?, ?, ?)")
-	check(err)
-	_, err = stmt.Exec(xactn, symbol, shares, date, amount)
-	check(err)
+	fmt.Println("converted args:", xactn, symbol, shares, amount, date)
+	if !testing {
+		sql_db, err := sql.Open("sqlite3", "/home/tgphelps/src/go/etfs/etfs.db")
+		check(err)
+		defer sql_db.Close()
+		stmt, err := sql_db.Prepare("insert into event (event_type, symbol, shares, date, amount) values (?, ?, ?, ?, ?)")
+		check(err)
+		_, err = stmt.Exec(xactn, symbol, shares, date, amount)
+		check(err)
+	} else {
+		fmt.Println("testing mode: No SQL done.")
+	}
 }
 
 func check(err error) {
@@ -65,4 +78,8 @@ func convert_args(args []string) (string, string, int, float64, string) {
 	check(err)
 	fmt.Println("yyyy-mm-dd", year, month, day)
 	return xactn, symbol, shares, amount, date
+}
+
+func print_usage() {
+	fmt.Println("usage: mktrans buy/sell sym shares amount yyyy-mm-dd")
 }
